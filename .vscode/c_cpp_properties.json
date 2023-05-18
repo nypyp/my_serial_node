@@ -1,0 +1,33 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/nypyp/ros_stm32_ws/devel/include/**",
+        "/home/nypyp/catkin_ws/devel/include/**",
+        "/opt/ros/melodic/include/**",
+        "/home/nypyp/catkin_ws/src/learing_msgs/include/**",
+        "/home/nypyp/catkin_ws/src/learning_communication/include/**",
+        "/home/nypyp/catkin_ws/src/learning_head/include/**",
+        "/home/nypyp/catkin_ws/src/learning_hello/include/**",
+        "/home/nypyp/catkin_ws/src/learning_python/include/**",
+        "/home/nypyp/catkin_ws/src/learning_srv_clnt/include/**",
+        "/home/nypyp/catkin_ws/src/learning_tf/include/**",
+        "/home/nypyp/catkin_ws/src/learning_topic/include/**",
+        "/home/nypyp/ros_stm32_ws/src/ros_stm32_bridge/include/**",
+        "/home/nypyp/ros_stm32_ws/src/stm32-ros-master/serial/include/**",
+        "/home/nypyp/catkin_ws/src/test_pkg/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}
