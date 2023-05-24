@@ -14,9 +14,11 @@
 #include <tf/transform_broadcaster.h>
 
 #define	sBUFFERSIZE	15//send buffer size 串口发送缓存长度
-#define	rBUFFERSIZE	27//receive buffer size 串口接收缓存长度
+#define	rBUFFERSIZE	25//receive buffer size 串口接收缓存长度
+#define cBUFFERSIZE 1//check package head 检查包头
 unsigned char s_buffer[sBUFFERSIZE];//发送缓存
 unsigned char r_buffer[rBUFFERSIZE];//接收缓存
+unsigned char check_buffer[cBUFFERSIZE];//检查包头
 
 /************************************
  * 串口数据发送格式共15字节
@@ -82,18 +84,16 @@ unsigned char data_analysis(unsigned char *buffer)
 {
 	unsigned char ret=0,csum;
 	//int i;
-	if((buffer[0]==0xaa) && (buffer[1]==0xaa)){
-		csum = buffer[2]^buffer[3]^buffer[4]^buffer[5]^buffer[6]^buffer[7]^
-				buffer[8]^buffer[9]^buffer[10]^buffer[11]^buffer[12]^buffer[13]^
-				buffer[14]^buffer[15]^buffer[16]^buffer[17]^buffer[18]^buffer[19]^
-				buffer[20]^buffer[21]^buffer[22]^buffer[23]^buffer[24]^buffer[25];
-		//ROS_INFO("check sum:0x%02x",csum);
-		if(csum == buffer[26]){
-			ret = 1;//校验通过，数据包正确
-		}
-		else 
-		  ret =0;//校验失败，丢弃数据包
+	csum = buffer[0]^buffer[1]^buffer[2]^buffer[3]^buffer[4]^buffer[5]^buffer[6]^buffer[7]^
+			buffer[8]^buffer[9]^buffer[10]^buffer[11]^buffer[12]^buffer[13]^
+			buffer[14]^buffer[15]^buffer[16]^buffer[17]^buffer[18]^buffer[19]^
+			buffer[20]^buffer[21]^buffer[22]^buffer[23];
+	ROS_INFO("check sum:0x%02x, the last:0x%02x",csum,buffer[24]);
+	if(csum == buffer[24]){
+		ret = 1;//校验通过，数据包正确
 	}
+	else 
+		ret =0;//校验失败，丢弃数据包
 	/*
 	for(i=0;i<rBUFFERSIZE;i++)
 	  ROS_INFO("0x%02x",buffer[i]);
@@ -110,7 +110,7 @@ void cmd_vel_callback(const geometry_msgs::Twist& cmd_vel){
 	data_pack(cmd_vel);
 }
 int main (int argc, char** argv){
-    ros::init(argc, argv, "my_serial_node");
+    ros::init(argc, argv, "my_serial_node_ras");
     ros::NodeHandle nh;
 
 	//订阅/turtle1/cmd_vel话题用于测试 $ rosrun turtlesim turtle_teleop_key
@@ -120,7 +120,7 @@ int main (int argc, char** argv){
 
     try
     {
-        ser.setPort("/dev/ttyUSB0");
+        ser.setPort("/dev/ttyCH343USB0");
         ser.setBaudrate(115200);
         serial::Timeout to = serial::Timeout::simpleTimeout(1000);
         ser.setTimeout(to);
@@ -160,27 +160,50 @@ int main (int argc, char** argv){
 
         if(ser.available()){
             ROS_INFO_STREAM("Reading from serial port");
-			ser.read(r_buffer,rBUFFERSIZE);
-			int i;
-			for(i=0;i<rBUFFERSIZE;i++)
-				ROS_INFO("[0x%02x]",r_buffer[i]);
-			ROS_INFO_STREAM("End reading from serial port");
+			ser.read(check_buffer,cBUFFERSIZE);
+			unsigned char check_pass=0xff;
+			//逐个字节检查包头，检查到包头再将完整数据包装载
+			while(check_pass!=0xaa){
+				if(check_buffer[0]==0xaa){	//检查到第一个包头
+					ser.read(check_buffer,cBUFFERSIZE);
+					ROS_INFO("Reading the first aa,load next: [0x%02x]",check_buffer[0]);
+					if(check_buffer[0]==0xaa){	//检查到第二个包头
+						check_pass=0xaa;
+						ROS_INFO("Reading the second aa: [0x%02x], pass the check",check_buffer[0]);
+						int i;
+						for(i=0;i<rBUFFERSIZE;i++){
+							ser.read(check_buffer,cBUFFERSIZE);
+							r_buffer[i] = check_buffer[0];
+							ROS_INFO("load next: [0x%02x]",r_buffer[i]);
+						}
+						ROS_INFO("End reading from serial port");
+					}else{
+						ser.read(check_buffer,cBUFFERSIZE);
+						ROS_INFO("Fail to read the second aa, load next: [0x%02x]",check_buffer[0]);
+					}
+				}else{	//没检查到包头，继续检查下一个字节
+					ser.read(check_buffer,cBUFFERSIZE);
+					ROS_INFO("Fail to read the first aa, load next: [0x%02x]",check_buffer[0]);
+				}
+			}
 			if(data_analysis(r_buffer) != 0){
 				int i;
 				for(i=0;i<4;i++){
-					posx.cvalue[i] = r_buffer[2+i];//x 坐标
-					posy.cvalue[i] = r_buffer[6+i];//y 坐标
-					vx.cvalue[i] = r_buffer[10+i];// x方向速度
-					vy.cvalue[i] = r_buffer[14+i];//y方向速度
-					va.cvalue[i] = r_buffer[18+i];//角速度
-					yaw.cvalue[i] = r_buffer[22+i];	//yaw 偏航角
+					posx.cvalue[i] = r_buffer[i];//x 坐标
+					posy.cvalue[i] = r_buffer[4+i];//y 坐标
+					vx.cvalue[i] = r_buffer[8+i];// x方向速度
+					vy.cvalue[i] = r_buffer[12+i];//y方向速度
+					va.cvalue[i] = r_buffer[16+i];//角速度
+					yaw.cvalue[i] = r_buffer[20+i];	//yaw 偏航角
 				}			
 				//将偏航角转换成四元数才能发布
 				odom_quat = tf::createQuaternionMsgFromYaw(yaw.fvalue);
 				
+				odom_trans.header.seq = 100;
+				odom_trans.header.stamp = ros::Time::now();
 				//发布坐标变换父子坐标系
-				odom_trans.header.frame_id = "odom";
-				odom_trans.child_frame_id = "base_link";
+				odom_trans.header.frame_id = "/odom";
+				odom_trans.child_frame_id = "base_footprint";
 				//填充获取的数据
 				odom_trans.transform.translation.x = posx.fvalue;//x坐标
 				odom_trans.transform.translation.y = posy.fvalue;//y坐标
@@ -194,7 +217,7 @@ int main (int argc, char** argv){
 				odom.header.stamp = current_time;
 				//里程计父子坐标系
 				odom.header.frame_id = "odom";
-				odom.child_frame_id = "base_link";
+				odom.child_frame_id = "base_footprint";
 				//里程计位置数据
 				odom.pose.pose.position.x = posx.fvalue;
 				odom.pose.pose.position.y = posy.fvalue;
@@ -208,8 +231,6 @@ int main (int argc, char** argv){
 				read_pub.publish(odom);
 				ROS_INFO("publish odometry");
 				last_time = current_time;				
-			}else{
-				ROS_INFO("Data_anaylize field! return code: %s",data_analysis(r_buffer));
 			}
 			memset(r_buffer,0,rBUFFERSIZE);
         }
