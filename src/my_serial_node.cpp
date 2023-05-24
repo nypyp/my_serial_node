@@ -202,7 +202,7 @@ int main (int argc, char** argv){
 				odom_trans.header.seq = 100;
 				odom_trans.header.stamp = ros::Time::now();
 				//发布坐标变换父子坐标系
-				odom_trans.header.frame_id = "/odom";
+				odom_trans.header.frame_id = "odom";
 				odom_trans.child_frame_id = "base_footprint";
 				//填充获取的数据
 				odom_trans.transform.translation.x = posx.fvalue;//x坐标
@@ -210,7 +210,7 @@ int main (int argc, char** argv){
 				odom_trans.transform.translation.z = 0;//z坐标				
 				odom_trans.transform.rotation = odom_quat;//偏航角
 				//发布tf坐标变换
-				//odom_broadcaster.sendTransform(odom_trans);
+				odom_broadcaster.sendTransform(odom_trans);
 				//获取当前时间
 				current_time = ros::Time::now();
 				//载入里程计时间戳
@@ -228,7 +228,7 @@ int main (int argc, char** argv){
 				odom.twist.twist.linear.y = vy.fvalue;
 				odom.twist.twist.angular.z = va.fvalue;
 				//发布里程计消息
-				//read_pub.publish(odom);
+				read_pub.publish(odom);
 				ROS_INFO("publish odometry");
 				last_time = current_time;				
 			}
